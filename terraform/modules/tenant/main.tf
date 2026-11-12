@@ -70,6 +70,9 @@ resource "helm_release" "tenant" {
       cluster           = var.db_cluster
       restoreTargetTime = var.restore_target_time
     }
+    odoo = {
+      hostname = var.domain
+    }
   })]
   depends_on = [
     kubernetes_secret_v1.db,

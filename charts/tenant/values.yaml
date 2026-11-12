@@ -10,6 +10,7 @@ db:
 
 odoo:
   image: odoo:18.0-20261102
+  hostname: odoo.localtest.me
   workers: 2
   filestoreSize: 1Gi
   resources:

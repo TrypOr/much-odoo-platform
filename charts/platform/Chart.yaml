@@ -1,0 +1,4 @@
+apiVersion: v2
+name: platform
+description: Shared platform objects (certificate issuers)
+version: 0.1.0
