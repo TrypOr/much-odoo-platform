@@ -12,3 +12,4 @@ down:
 
 smoke:
 	./scripts/smoke.sh
+
