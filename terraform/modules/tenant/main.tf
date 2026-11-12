@@ -63,6 +63,7 @@ resource "helm_release" "tenant" {
   name      = "tenant"
   chart     = var.chart_path
   namespace = local.ns
+  timeout   = 900
   values = [yamlencode({
     db = {
       instances         = var.db_instances
@@ -72,7 +73,22 @@ resource "helm_release" "tenant" {
   })]
   depends_on = [
     kubernetes_secret_v1.db,
+    kubernetes_secret_v1.admin,
     kubernetes_resource_quota_v1.this,
     kubernetes_limit_range_v1.this,
   ]
+}
+resource "random_password" "admin" {
+  length  = 32
+  special = false
+}
+
+resource "kubernetes_secret_v1" "admin" {
+  metadata {
+    name      = "odoo-admin"
+    namespace = local.ns
+  }
+  data = {
+    admin_passwd = random_password.admin.result
+  }
 }

@@ -11,8 +11,7 @@ provider "helm" {
 }
 
 resource "terraform_data" "cluster" {
-  input            = "much"
-  triggers_replace = filesha256("${path.module}/../k3d/cluster.yaml")
+  input = "much"
 
   provisioner "local-exec" {
     command = "k3d cluster list ${self.input} >/dev/null 2>&1 || k3d cluster create --config ${path.module}/../k3d/cluster.yaml"

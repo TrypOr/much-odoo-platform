@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: odoo }
+  template:
+    metadata:
+      labels: { app: odoo }
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/odoo-config.yaml") . | sha256sum }}
+    spec:
+      initContainers:
+        - name: init
+          image: {{ .Values.odoo.image }}
+          command: ["bash", "/config/init.sh"]
+          env:
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: odoo-db, key: password } }
+            - name: ADMIN_PASSWD
+              valueFrom: { secretKeyRef: { name: odoo-admin, key: admin_passwd } }
+          resources: {{- toYaml .Values.odoo.resources | nindent 12 }}
+          volumeMounts:
+            - { name: config-tmpl, mountPath: /config }
+            - { name: config, mountPath: /etc/odoo }
+            - { name: filestore, mountPath: /var/lib/odoo }
+      containers:
+        - name: odoo
+          image: {{ .Values.odoo.image }}
+          command: ["odoo", "-c", "/etc/odoo/odoo.conf"]
+          ports:
+            - { name: http, containerPort: 8069 }
+            - { name: websocket, containerPort: 8072 }
+          readinessProbe:
+            httpGet: { path: /web/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /web/health, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 5
+          resources: {{- toYaml .Values.odoo.resources | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/odoo }
+            - { name: filestore, mountPath: /var/lib/odoo }
+      volumes:
+        - name: config-tmpl
+          configMap: { name: odoo-config }
+        - name: config
+          emptyDir: {}
+        - name: filestore
+          persistentVolumeClaim: { claimName: odoo-filestore }

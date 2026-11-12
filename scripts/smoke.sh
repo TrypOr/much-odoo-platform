@@ -20,7 +20,12 @@ for t in $TENANTS; do
   true)"
     pw="$(kubectl -n "$t" get secret odoo-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
     check "$t sql via pooler" 1 "$(kubectl -n "$t" exec "$t-db-1" -c postgres -- env PGPASSWORD="$pw" \
-      psql -h "$t-pooler-rw" -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
+    psql -h "$t-pooler-rw" -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
+
+    check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
+    check "$t db manager disabled" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- python3 -c \
+    "import urllib.request;print(int('disabled by the administrator' in
+    urllib.request.urlopen('http://localhost:8069/web/database/manager').read().decode()))" 2>/dev/null || true)"
 done
 
 exit "$fail"

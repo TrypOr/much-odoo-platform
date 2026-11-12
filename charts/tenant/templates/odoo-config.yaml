@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: odoo-config
+data:
+  odoo.conf.tmpl: |
+    [options]
+    db_host = {{ .Release.Namespace }}-pooler-rw
+    db_port = 5432
+    db_user = odoo
+    db_password = __DB_PASSWORD__
+    db_name = odoo
+    dbfilter = ^odoo$
+    list_db = False
+    admin_passwd = __ADMIN_PASSWD__
+    proxy_mode = True
+    data_dir = /var/lib/odoo
+    workers = {{ .Values.odoo.workers }}
+    max_cron_threads = 1
+    gevent_port = 8072
+    limit_memory_soft = 671088640
+    limit_memory_hard = 805306368
+    without_demo = all
+  init.sh: |
+    set -eu
+    sed -e "s|__DB_PASSWORD__|$DB_PASSWORD|" -e "s|__ADMIN_PASSWD__|$ADMIN_PASSWD|" \
+      /config/odoo.conf.tmpl > /etc/odoo/odoo.conf
+    export PGHOST={{ .Release.Namespace }}-pooler-rw PGUSER=odoo PGDATABASE=odoo PGPASSWORD="$DB_PASSWORD"
+    until pg_isready -q; do echo "waiting for database"; sleep 2; done
+    if psql -tAc "select 1 from ir_module_module where name='base' and state='installed'" 2>/dev/null | grep -q 1; then
+      echo "database already initialised"
+    else
+      echo "installing base"
+      odoo -c /etc/odoo/odoo.conf -i base --stop-after-init
+    fi

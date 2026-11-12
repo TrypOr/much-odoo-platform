@@ -7,3 +7,11 @@ db:
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits: { memory: 512Mi }
+
+odoo:
+  image: odoo:18.0-20261102
+  workers: 2
+  filestoreSize: 1Gi
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { memory: 1536Mi }
