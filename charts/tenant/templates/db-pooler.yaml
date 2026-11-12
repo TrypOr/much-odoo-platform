@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ .Release.Namespace }}-pooler-rw
+spec:
+  cluster:
+    name: {{ include "tenant.dbCluster" . }}
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
