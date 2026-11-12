@@ -16,3 +16,8 @@ else
     fail=1
 fi
 }
+odoo_http() {
+kubectl -n "$1" exec deploy/odoo -c odoo -- python3 -c "import urllib.request,urllib.error,sys
+try: print(urllib.request.urlopen('http://localhost:8069'+sys.argv[1]).status)
+except urllib.error.HTTPError as e: print(e.code)" "$2" 2>/dev/null || true
+}
