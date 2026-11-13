@@ -1,6 +1,6 @@
 TF := terraform -chdir=terraform
 
-.PHONY: up down smoke backup restore-test
+.PHONY: up down smoke backup restore-test grafana-password
 
 up:
 	$(TF) init -input=false
@@ -18,3 +18,6 @@ backup:
 
 restore-test:
 	./scripts/restore-test.sh $(TENANT)
+
+grafana-password:
+	@$(TF) output -raw grafana_admin_password; echo

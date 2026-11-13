@@ -1,0 +1,15 @@
+config:
+  modules:
+    odoo_login:
+      prober: http
+      timeout: 10s
+      http:
+        preferred_ip_protocol: ip4
+        valid_status_codes: [200]
+        fail_if_body_not_matches_regexp: ["Log in"]
+        tls_config:
+          # local CA isn't in the exporter's trust store; cert expiry is still measured
+          insecure_skip_verify: true
+resources:
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { memory: 64Mi }

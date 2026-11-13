@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchExpressions:
+      - { key: cnpg.io/podRole, operator: In, values: [instance, pooler] }
+  podMetricsEndpoints:
+    - port: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: odoo-login
+spec:
+  jobName: odoo-login
+  interval: 30s
+  module: odoo_login
+  prober:
+    url: blackbox-prometheus-blackbox-exporter.monitoring.svc:9115
+  targets:
+    staticConfig:
+      static: [https://{{ .Values.odoo.hostname }}/web/login]
+      labels:
+        tenant: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: odoo-queries
+data:
+  queries: |
+    odoo_cron:
+      query: "SELECT coalesce(extract(epoch FROM now() AT TIME ZONE 'UTC' - min(nextcall)), 0) AS oldest_due_seconds FROM ir_cron WHERE active"
+      primary: true
+      target_databases: ["odoo"]
+      metrics:
+        - oldest_due_seconds:
+            usage: GAUGE
+            description: Seconds the most overdue active Odoo scheduled action has been waiting

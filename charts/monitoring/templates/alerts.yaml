@@ -1,0 +1,77 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: much-tenants
+spec:
+  groups:
+    - name: much.availability
+      rules:
+        - alert: OdooDown
+          expr: probe_success{job="odoo-login"} == 0
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "Odoo login page for {{`{{ $labels.tenant }}`}} is failing from the outside"
+            runbook: "kubectl -n {{`{{ $labels.tenant }}`}} get pods; kubectl -n {{`{{ $labels.tenant }}`}} logs deploy/odoo"
+        - alert: OdooRestarting
+          expr: increase(kube_pod_container_status_restarts_total{container="odoo"}[30m]) > 2
+          labels: { severity: warning }
+          annotations:
+            summary: "Odoo in {{`{{ $labels.namespace }}`}} restarted more than twice in 30 minutes"
+        - alert: PostgresNotReady
+          expr: kube_pod_container_status_ready{container="postgres"} == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Postgres pod {{`{{ $labels.pod }}`}} in {{`{{ $labels.namespace }}`}} not ready for 5 minutes"
+        - alert: CertificateExpiringSoon
+          expr: probe_ssl_earliest_cert_expiry - time() < 14 * 86400
+          labels: { severity: warning }
+          annotations:
+            summary: "TLS certificate for {{`{{ $labels.tenant }}`}} expires in under 14 days (renewal is failing)"
+
+    - name: much.data-safety
+      rules:
+        # Uses the Barman plugin metric: cnpg_collector_last_available_backup_timestamp stays 0 with plugin backups.
+        - alert: BackupStale
+          expr: time() - max by (namespace) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp) > 2 * 3600
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "No successful base backup for {{`{{ $labels.namespace }}`}} in over 2 hours (prod threshold: 26h)"
+            runbook: "kubectl -n {{`{{ $labels.namespace }}`}} get backup; make backup TENANT={{`{{ $labels.namespace }}`}}"
+        - alert: BackupFailed
+          expr: |
+            max by (namespace) (barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp)
+              > max by (namespace) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp)
+          labels: { severity: warning }
+          annotations:
+            summary: "Latest base backup attempt for {{`{{ $labels.namespace }}`}} failed"
+        - alert: WALArchivingFailing
+          # most recent archive attempt failed; an idle database simply archives nothing, which is fine
+          expr: |
+            cnpg_pg_stat_archiver_last_failed_time > cnpg_pg_stat_archiver_last_archived_time
+            and on (namespace, pod) cnpg_pg_replication_in_recovery == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "WAL archiving failing on {{`{{ $labels.pod }}`}}: point-in-time recovery window is not advancing"
+        - alert: FilestoreBackupStale
+          expr: time() - kube_cronjob_status_last_successful_time{cronjob="filestore-backup"} > 45 * 60
+          labels: { severity: critical }
+          annotations:
+            summary: "Filestore (attachments) of {{`{{ $labels.namespace }}`}} not backed up in 45 minutes"
+        - alert: FilestoreBackupJobFailed
+          expr: kube_job_status_failed{job_name=~"filestore-backup.*"} > 0
+          labels: { severity: warning }
+          annotations:
+            summary: "Filestore backup job {{`{{ $labels.job_name }}`}} in {{`{{ $labels.namespace }}`}} failed"
+
+    - name: much.application
+      rules:
+        - alert: OdooCronStuck
+          expr: cnpg_odoo_cron_oldest_due_seconds > 3600
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "Odoo scheduled actions in {{`{{ $labels.namespace }}`}} are over an hour overdue (cron workers stuck or disabled)"

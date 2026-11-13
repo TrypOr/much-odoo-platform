@@ -21,6 +21,13 @@ kubectl -n cert-manager get secret much-ca -o jsonpath='{.data.ca\.crt}' 2>/dev/
 check "object storage available" True "$(kubectl -n objectstore get deploy s3 \
   -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
 
+log "Monitoring"
+check "prometheus ready" True "$(kubectl -n monitoring get prometheus kps-kube-prometheus-stack-prometheus -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+check "grafana via https" 200 "$(curl -s --cacert "$CA" --resolve grafana.localtest.me:8443:127.0.0.1 -o /dev/null -w '%{http_code}' --max-time 10 https://grafana.localtest.me:8443/api/health || true)"
+check "alert rules loaded" 3 "$(prom 'count(count by (rule_group) (prometheus_rule_group_rules{rule_group=~".*much.*"}))')"
+deadman="$(kubectl -n monitoring logs deploy/alert-sink --since=15m 2>/dev/null | grep -c 'POST /deadman' || true)"
+check "dead-man switch delivering" yes "$([ "${deadman:-0}" -gt 0 ] && echo yes || echo no)"
+
 for t in $TENANTS; do
     log "Tenant $t"
     db="$(kubectl -n "$t" get svc db -o jsonpath='{.metadata.annotations.much\.io/db-cluster}' 2>/dev/null || true)"
@@ -37,6 +44,8 @@ for t in $TENANTS; do
     rw() { kubectl -n "$t" get objectstore "$t-backups" -o jsonpath="{.status.serverRecoveryWindow['$db'].$1}" 2>/dev/null || true; }
     check "$t recovery window exists" yes "$([ -n "$(rw firstRecoverabilityPoint)" ] && echo yes || echo no)"
     check "$t last backup succeeded" True "$(cond LastBackupSucceeded)"
+    check "$t probed from outside" 1 "$(prom "probe_success{job=\"odoo-login\",tenant=\"$t\"}")"
+    check "$t postgres metrics scraped" 1 "$(prom "max(up{namespace=\"$t\",container=\"postgres\"})")"
     check "$t filestore backup has run" yes "$([ -n "$(kubectl -n "$t" get cronjob filestore-backup -o jsonpath='{.status.lastSuccessfulTime}' 2>/dev/null)" ] && echo yes || echo no)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
