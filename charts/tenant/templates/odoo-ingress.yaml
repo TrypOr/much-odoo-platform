@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: odoo
+  annotations:
+    cert-manager.io/cluster-issuer: much-ca
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [{{ .Values.odoo.hostname }}]
+      secretName: odoo-tls
+  rules:
+    - host: {{ .Values.odoo.hostname }}
+      http:
+        paths:
+          - path: /websocket
+            pathType: Prefix
+            backend: { service: { name: odoo, port: { name: websocket } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: odoo, port: { name: http } } }

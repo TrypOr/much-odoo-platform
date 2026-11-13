@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: much-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: much-local-ca
+  secretName: much-ca
+  duration: 87600h
+  privateKey: { algorithm: ECDSA, size: 256 }
+  issuerRef: { name: selfsigned, kind: ClusterIssuer }
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: much-ca
+spec:
+  ca:
+    secretName: much-ca

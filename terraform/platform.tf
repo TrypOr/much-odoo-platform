@@ -30,3 +30,10 @@ resource "helm_release" "barman_plugin" {
   wait       = true
   depends_on = [helm_release.cnpg, helm_release.cert_manager]
 }
+
+resource "helm_release" "platform" {
+  name       = "platform"
+  chart      = "${path.module}/../charts/platform"
+  namespace  = "cert-manager"
+  depends_on = [helm_release.cert_manager]
+}

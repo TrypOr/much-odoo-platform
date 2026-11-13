@@ -12,5 +12,5 @@ module "tenant" {
   domain     = "${each.key}.localtest.me"
   size       = each.value.size
   chart_path = "${path.module}/../charts/tenant"
-  depends_on = [helm_release.cnpg, helm_release.barman_plugin]
+  depends_on = [helm_release.cnpg, helm_release.barman_plugin, helm_release.platform]
 }
