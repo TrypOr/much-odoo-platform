@@ -14,3 +14,7 @@
 {{ .Release.Namespace }}
 {{- end -}}
 {{- end -}}
+
+{{- define "tenant.restoreServerName" -}}
+{{ .Release.Namespace }}-db-restore-{{ .Values.db.restoreTargetTime | default "latest" | lower | replace ":" "" | replace "-" "" }}
+{{- end -}}
