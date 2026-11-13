@@ -46,6 +46,7 @@ for t in $TENANTS; do
     check "$t last backup succeeded" True "$(cond LastBackupSucceeded)"
     check "$t probed from outside" 1 "$(prom "probe_success{job=\"odoo-login\",tenant=\"$t\"}")"
     check "$t postgres metrics scraped" 1 "$(prom "max(up{namespace=\"$t\",container=\"postgres\"})")"
+    # shellcheck disable=SC2143  # grep -q would SIGPIPE kubectl and fail under pipefail
     check "$t filestore backup has run" yes "$([ -n "$(kubectl -n "$t" get jobs -o jsonpath='{range .items[?(@.status.succeeded==1)]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep filestore-backup)" ] && echo yes || echo no)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"

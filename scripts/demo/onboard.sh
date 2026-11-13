@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Demo: onboard a new customer end to end and time it.
+# shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/../lib.sh"
 
 name="${1:?usage: onboard.sh <tenant> [size]}"; size="${2:-s}"
