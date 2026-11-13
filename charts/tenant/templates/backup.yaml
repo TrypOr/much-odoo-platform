@@ -5,7 +5,7 @@ metadata:
 spec:
   retentionPolicy: {{ .Values.backup.retention | quote }}
   configuration:
-    destinationPath: s3://{{ .Values.backup.bucket }}/{{ .Release.Namespace }}
+    destinationPath: s3://{{ .Values.backup.bucket }}/{{ include "tenant.backupPrefix" . }}
     endpointURL: {{ .Values.backup.endpoint }}
     s3Credentials:
       accessKeyId: { name: backup-s3, key: ACCESS_KEY_ID }
