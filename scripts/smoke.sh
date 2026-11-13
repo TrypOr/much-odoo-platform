@@ -18,6 +18,9 @@ CA="$(mktemp)"
 trap 'rm -f "$CA"' EXIT
 kubectl -n cert-manager get secret much-ca -o jsonpath='{.data.ca\.crt}' 2>/dev/null | base64 -d > "$CA" || true
 
+check "object storage available" True "$(kubectl -n objectstore get deploy s3 \
+  -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+
 for t in $TENANTS; do
     log "Tenant $t"
     check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$t-db" -o jsonpath='{.status.phase}' 2>/dev/null ||
@@ -25,6 +28,13 @@ for t in $TENANTS; do
     pw="$(kubectl -n "$t" get secret odoo-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
     check "$t sql via pooler" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- env PGPASSWORD="$pw" \
     psql -h "$t-pooler-rw" -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
+
+    cond() { kubectl -n "$t" get cluster "$t-db" -o jsonpath="{.status.conditions[?(@.type==\"$1\")].status}" 2>/dev/null || true; }
+    archiver="$(kubectl -n "$t" get cluster "$t-db" -o jsonpath='{.spec.plugins[?(@.isWALArchiver==true)].name}' 2>/dev/null || true)"
+    check "$t WAL archived to object storage" "barman-cloud.cloudnative-pg.io/True" "$archiver/$(cond ContinuousArchiving)"
+    rw() { kubectl -n "$t" get objectstore "$t-backups" -o jsonpath="{.status.serverRecoveryWindow['$t-db'].$1}" 2>/dev/null || true; }
+    check "$t recovery window exists" yes "$([ -n "$(rw firstRecoverabilityPoint)" ] && echo yes || echo no)"
+    check "$t last backup succeeded" True "$(cond LastBackupSucceeded)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
     check "$t db manager disabled" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- python3 -c \

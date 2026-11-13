@@ -1,0 +1,4 @@
+apiVersion: v2
+name: objectstore
+description: S3-compatible backup storage (local stand-in for a cloud bucket)
+version: 0.1.0

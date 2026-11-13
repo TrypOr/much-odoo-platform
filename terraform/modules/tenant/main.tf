@@ -77,6 +77,7 @@ resource "helm_release" "tenant" {
   depends_on = [
     kubernetes_secret_v1.db,
     kubernetes_secret_v1.admin,
+    kubernetes_secret_v1.backup,
     kubernetes_resource_quota_v1.this,
     kubernetes_limit_range_v1.this,
   ]
@@ -93,5 +94,15 @@ resource "kubernetes_secret_v1" "admin" {
   }
   data = {
     admin_passwd = random_password.admin.result
+  }
+}
+resource "kubernetes_secret_v1" "backup" {
+  metadata {
+    name      = "backup-s3"
+    namespace = local.ns
+  }
+  data = {
+    ACCESS_KEY_ID     = var.s3_access_key
+    ACCESS_SECRET_KEY = var.s3_secret_key
   }
 }

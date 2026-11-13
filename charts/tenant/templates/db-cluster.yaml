@@ -9,6 +9,11 @@ spec:
     size: {{ .Values.db.storage }}
   resources:
     {{- toYaml .Values.db.resources | nindent 4 }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Release.Namespace }}-backups
   bootstrap:
     initdb:
       database: odoo

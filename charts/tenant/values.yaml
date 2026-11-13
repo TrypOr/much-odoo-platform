@@ -16,3 +16,8 @@ odoo:
   resources:
     requests: { cpu: 200m, memory: 512Mi }
     limits: { memory: 1536Mi }
+backup:
+  endpoint: http://s3.objectstore:8333
+  bucket: backups
+  schedule: "0 0 * * * *"
+  retention: 7d
