@@ -1,9 +1,5 @@
 locals {
-  tenants = {
-    # Restore: add  db_cluster = "restore", restore_target_time = "2026-11-13T10:00:00Z"
-    acme   = { size = "s" }
-    globex = { size = "s" }
-  }
+  tenants = yamldecode(file("${path.module}/../tenants.yaml"))
 }
 
 module "tenant" {
@@ -11,9 +7,10 @@ module "tenant" {
   for_each            = local.tenants
   name                = each.key
   domain              = "${each.key}.localtest.me"
-  size                = each.value.size
-  db_cluster          = try(each.value.db_cluster, "primary")
-  restore_target_time = try(each.value.restore_target_time, null)
+  size                = try(each.value.size, "s")
+  db_instances        = try(each.value.instances, 1)
+  db_cluster          = try(each.value.restore, null) == null ? "primary" : "restore"
+  restore_target_time = try(each.value.restore, null)
   chart_path          = "${path.module}/../charts/tenant"
   s3_access_key       = random_password.s3_access_key.result
   s3_secret_key       = random_password.s3_secret_key.result

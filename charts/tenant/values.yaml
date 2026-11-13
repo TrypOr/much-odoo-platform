@@ -1,6 +1,7 @@
 db:
   image: ghcr.io/cloudnative-pg/postgresql:17.10-system-trixie
   instances: 1
+  smartShutdownTimeout: 15
   storage: 2Gi
   cluster: primary
   restoreTargetTime: null
