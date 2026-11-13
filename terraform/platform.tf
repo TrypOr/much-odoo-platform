@@ -37,3 +37,25 @@ resource "helm_release" "platform" {
   namespace  = "cert-manager"
   depends_on = [helm_release.cert_manager]
 }
+
+resource "random_password" "s3_access_key" {
+  length  = 20
+  special = false
+}
+
+resource "random_password" "s3_secret_key" {
+  length  = 40
+  special = false
+}
+
+resource "helm_release" "objectstore" {
+  name             = "objectstore"
+  chart            = "${path.module}/../charts/objectstore"
+  namespace        = "objectstore"
+  create_namespace = true
+  set_sensitive = [
+    { name = "accessKey", value = random_password.s3_access_key.result },
+    { name = "secretKey", value = random_password.s3_secret_key.result },
+  ]
+  depends_on = [terraform_data.cluster]
+}

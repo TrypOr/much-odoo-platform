@@ -1,0 +1,30 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Release.Namespace }}-backups
+spec:
+  retentionPolicy: {{ .Values.backup.retention | quote }}
+  configuration:
+    destinationPath: s3://{{ .Values.backup.bucket }}/{{ .Release.Namespace }}
+    endpointURL: {{ .Values.backup.endpoint }}
+    s3Credentials:
+      accessKeyId: { name: backup-s3, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: backup-s3, key: ACCESS_SECRET_KEY }
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Release.Namespace }}-db-hourly
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  immediate: true
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Release.Namespace }}-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
