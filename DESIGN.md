@@ -112,7 +112,9 @@ HSTS. The default Odoo `admin/admin` user login must be randomised at onboarding
 | Filestore (attachments) | `rclone sync` every 15 min; changed or deleted files kept under `filestore-history/<timestamp>` | ≤ 15 min |
 | Platform config and secrets | Terraform code + state | per change |
 
-- Storage is S3-compatible object storage, one prefix per tenant (`s3://backups/<tenant>/…`).
+- Storage is S3-compatible object storage, one prefix per tenant **lifetime**: `s3://backups/<tenant>/<namespace-uid>/…`.
+  An offboarded customer's backups stay for the retention period; a re-created tenant with the same name starts a
+  fresh archive (see §9).
 - Locally the bucket is SeaweedFS (Apache-2.0, pinned). Postgres backups and the filestore job only know an
   S3 endpoint and keys, so moving to any provider's object storage changes configuration, not code.
 - New tenants are backed up from minute one: onboarding triggers the first filestore backup and the first base
@@ -191,6 +193,7 @@ found or designed for, and how each is caught:
 | Certificate renewal failing | Fine until expiry day | `CertificateExpiringSoon` (< 14 days) from probes |
 | Alerting pipeline dead | A dead Alertmanager looks exactly like a quiet, healthy platform | Watchdog → dead-man endpoint every minute; in production an external heartbeat service pages if it stops |
 | Config drift (manual edits) | Cluster no longer matches Git | `terraform plan -detailed-exitcode` in CI; re-apply heals (demonstrated with the backup secret) |
+| Re-onboarded tenant collides with its old backups | Odoo and Postgres run fine; Barman refuses to archive into a non-empty path ("Expected empty archive"), so the tenant has **no backups** (found by removing and re-adding a tenant) | smoke asserts a recovery window exists; backup path now includes the namespace UID |
 | Archive alert on idle tenants | Naive "time since last WAL" pages for a quiet tenant (false positive found during build) | alert fires only when the most recent archive attempt failed |
 
 ## 10. High availability and scaling a tenant
@@ -271,6 +274,8 @@ merge.
   - a NetworkPolicy blocking replica creation
 
   Lesson: practise the disaster.
+- **Offboarding and re-onboarding a customer silently disabled its backups.** The old archive was still at the
+  same path. Backup locations are now tied to the tenant's lifetime (namespace UID), not its name.
 - **WSL2 clock jitter** made a default Alertmanager crash-loop rule fire with zero restarts. I disabled it,
   documented why, and crash loops are still caught by restart counts.
 
