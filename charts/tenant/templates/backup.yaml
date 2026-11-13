@@ -18,13 +18,13 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: {{ .Release.Namespace }}-db-hourly
+  name: {{ include "tenant.dbCluster" . }}-hourly
 spec:
   schedule: {{ .Values.backup.schedule | quote }}
   immediate: true
   backupOwnerReference: self
   cluster:
-    name: {{ .Release.Namespace }}-db
+    name: {{ include "tenant.dbCluster" . }}
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io

@@ -1,6 +1,6 @@
 TF := terraform -chdir=terraform
 
-.PHONY: up down smoke backup
+.PHONY: up down smoke backup restore-test
 
 up:
 	$(TF) init -input=false
@@ -15,3 +15,6 @@ smoke:
 
 backup:
 	./scripts/backup.sh $(TENANT)
+
+restore-test:
+	./scripts/restore-test.sh $(TENANT)

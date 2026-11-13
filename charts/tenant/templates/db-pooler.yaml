@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: {{ .Release.Namespace }}-pooler-rw
+  name: {{ include "tenant.dbCluster" . }}-pooler
 spec:
   cluster:
     name: {{ include "tenant.dbCluster" . }}
@@ -16,3 +16,15 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  annotations:
+    much.io/db-cluster: {{ include "tenant.dbCluster" . }}
+spec:
+  selector:
+    cnpg.io/poolerName: {{ include "tenant.dbCluster" . }}-pooler
+  ports:
+    - { name: pgbouncer, port: 5432, targetPort: 5432 }

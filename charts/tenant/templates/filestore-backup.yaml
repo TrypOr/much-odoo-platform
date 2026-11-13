@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: filestore-backup
+spec:
+  schedule: {{ .Values.filestoreBackup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels: { app: filestore-backup }
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: rclone
+              image: {{ .Values.filestoreBackup.image }}
+              command: ["sh", "-c"]
+              args:
+                - >-
+                  rclone sync /filestore s3:{{ .Values.backup.bucket }}/{{ .Release.Namespace }}/filestore
+                  --exclude "sessions/**"
+                  --backup-dir s3:{{ .Values.backup.bucket }}/{{ .Release.Namespace }}/filestore-history/$(date +%Y%m%dT%H%M%S)
+                  --stats-one-line -v
+              env:
+                - { name: HOME, value: /tmp }
+                - { name: RCLONE_CONFIG_S3_TYPE, value: s3 }
+                - { name: RCLONE_CONFIG_S3_PROVIDER, value: SeaweedFS }
+                - { name: RCLONE_CONFIG_S3_ENDPOINT, value: {{ .Values.backup.endpoint | quote }} }
+                - name: RCLONE_CONFIG_S3_ACCESS_KEY_ID
+                  valueFrom: { secretKeyRef: { name: backup-s3, key: ACCESS_KEY_ID } }
+                - name: RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: backup-s3, key: ACCESS_SECRET_KEY } }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - { name: filestore, mountPath: /filestore, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: filestore
+              persistentVolumeClaim: { claimName: odoo-filestore, readOnly: true }
+            - name: tmp
+              emptyDir: {}

@@ -1,0 +1,37 @@
+{{- if eq .Values.db.cluster "restore" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Namespace }}-db-restore
+spec:
+  instances: {{ .Values.db.instances }}
+  imageName: {{ .Values.db.image }}
+  storage:
+    size: {{ .Values.db.storage }}
+  resources:
+    {{- toYaml .Values.db.resources | nindent 4 }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Release.Namespace }}-backups
+        serverName: {{ .Release.Namespace }}-db-restore
+  bootstrap:
+    recovery:
+      source: origin
+      database: odoo
+      owner: odoo
+      secret:
+        name: odoo-db
+      {{- with .Values.db.restoreTargetTime }}
+      recoveryTarget:
+        targetTime: {{ . | quote }}
+      {{- end }}
+  externalClusters:
+    - name: origin
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: {{ .Release.Namespace }}-backups
+          serverName: {{ .Release.Namespace }}-db
+{{- end }}

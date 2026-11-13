@@ -23,18 +23,21 @@ check "object storage available" True "$(kubectl -n objectstore get deploy s3 \
 
 for t in $TENANTS; do
     log "Tenant $t"
-    check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$t-db" -o jsonpath='{.status.phase}' 2>/dev/null ||
+    db="$(kubectl -n "$t" get svc db -o jsonpath='{.metadata.annotations.much\.io/db-cluster}' 2>/dev/null || true)"
+    db="${db:-$t-db}"
+    check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.status.phase}' 2>/dev/null ||
   true)"
     pw="$(kubectl -n "$t" get secret odoo-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
     check "$t sql via pooler" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- env PGPASSWORD="$pw" \
-    psql -h "$t-pooler-rw" -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
+    psql -h db -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
 
-    cond() { kubectl -n "$t" get cluster "$t-db" -o jsonpath="{.status.conditions[?(@.type==\"$1\")].status}" 2>/dev/null || true; }
-    archiver="$(kubectl -n "$t" get cluster "$t-db" -o jsonpath='{.spec.plugins[?(@.isWALArchiver==true)].name}' 2>/dev/null || true)"
+    cond() { kubectl -n "$t" get cluster "$db" -o jsonpath="{.status.conditions[?(@.type==\"$1\")].status}" 2>/dev/null || true; }
+    archiver="$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.spec.plugins[?(@.isWALArchiver==true)].name}' 2>/dev/null || true)"
     check "$t WAL archived to object storage" "barman-cloud.cloudnative-pg.io/True" "$archiver/$(cond ContinuousArchiving)"
-    rw() { kubectl -n "$t" get objectstore "$t-backups" -o jsonpath="{.status.serverRecoveryWindow['$t-db'].$1}" 2>/dev/null || true; }
+    rw() { kubectl -n "$t" get objectstore "$t-backups" -o jsonpath="{.status.serverRecoveryWindow['$db'].$1}" 2>/dev/null || true; }
     check "$t recovery window exists" yes "$([ -n "$(rw firstRecoverabilityPoint)" ] && echo yes || echo no)"
     check "$t last backup succeeded" True "$(cond LastBackupSucceeded)"
+    check "$t filestore backup has run" yes "$([ -n "$(kubectl -n "$t" get cronjob filestore-backup -o jsonpath='{.status.lastSuccessfulTime}' 2>/dev/null)" ] && echo yes || echo no)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
     check "$t db manager disabled" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- python3 -c \
@@ -51,10 +54,10 @@ for t in $TENANTS; do
 
     spec="$(kubectl -n "$t" get deploy odoo -o jsonpath='{.spec.template.spec.securityContext.runAsNonRoot}/{.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem}/{.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation}' 2>/dev/null || true)"
     check "$t odoo enforced non-root/read-only/no-escalation" "true/true/false" "$spec"
-    check "$t odoo cannot bypass pooler" blocked "$(can_connect "$t" "$t-db-rw")"
+    check "$t odoo cannot bypass pooler" blocked "$(can_connect "$t" "$db-rw")"
     for o in $TENANTS; do
       [ "$o" = "$t" ] && continue
-      check "$t cannot reach $o database" blocked "$(can_connect "$t" "$o-pooler-rw.$o")"
+      check "$t cannot reach $o database" blocked "$(can_connect "$t" "db.$o")"
     done
     
 done

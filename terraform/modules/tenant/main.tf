@@ -1,7 +1,7 @@
 locals {
   sizes = {
-    s = { req_cpu = "1", req_mem = "2Gi", lim_mem = "3Gi", storage = "10Gi" }
-    m = { req_cpu = "2", req_mem = "4Gi", lim_mem = "6Gi", storage = "30Gi" }
+    s = { req_cpu = "1", req_mem = "3Gi", lim_mem = "5Gi", storage = "10Gi" }
+    m = { req_cpu = "2", req_mem = "5Gi", lim_mem = "8Gi", storage = "30Gi" }
   }
   quota = local.sizes[var.size]
   ns    = kubernetes_namespace_v1.this.metadata[0].name
