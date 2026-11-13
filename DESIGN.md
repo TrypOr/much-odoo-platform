@@ -146,11 +146,13 @@ CI runs it on every pull request.
 **Measured:** RTO **57–60 s** for a fresh tenant (restore + verification). Real switch-over tested on
 `globex`: a deleted row came back, Odoo served from the restored database, every smoke check green.
 
-**Two bugs only an actual restore revealed:**
+**Three bugs only an actual restore revealed:**
 1. CNPG makes a Pooler's cluster reference **immutable**, so "repoint the pooler" was impossible. Fix: a
    pooler per cluster and our own stable `db` Service in front.
 2. The tenant quota had **no headroom for a second database**, so the recovery job was rejected. Quotas now
    include restore capacity.
+3. A **second restore** of the same tenant failed ("Expected empty archive") because every restore archived under
+   the same name. Each restore now archives under a name that includes its target time.
 
 **Known gap:** the database restores to any second, attachments only to the last 15-minute sync. Production fix:
 filestore on object storage (Odoo S3 attachment module) or volume snapshots taken with the base backup.
