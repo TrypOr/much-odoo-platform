@@ -51,8 +51,10 @@ spec:
     - from:
         - podSelector:
             matchLabels: { cnpg.io/podRole: pooler }
+        # replicas and CNPG's own jobs (e.g. the join job that clones a new replica)
         - podSelector:
-            matchLabels: { cnpg.io/podRole: instance }
+            matchExpressions:
+              - { key: cnpg.io/cluster, operator: Exists }
       ports:
         - { port: 5432 }
     - from:

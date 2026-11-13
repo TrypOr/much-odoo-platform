@@ -1,6 +1,6 @@
 TF := terraform -chdir=terraform
 
-.PHONY: up down smoke backup restore-test grafana-password
+.PHONY: up down smoke backup restore-test grafana-password onboard failover
 
 up:
 	$(TF) init -input=false
@@ -21,3 +21,9 @@ restore-test:
 
 grafana-password:
 	@$(TF) output -raw grafana_admin_password; echo
+
+onboard:
+	./scripts/demo/onboard.sh $(NAME) $(SIZE)
+
+failover:
+	./scripts/demo/failover.sh $(TENANT)

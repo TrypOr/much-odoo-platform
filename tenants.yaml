@@ -1,0 +1,8 @@
+# One entry per customer. Adding a customer = one line here + `make up`.
+#   size:       s | m                      (quota: s = 3Gi/5Gi memory, m = 5Gi/8Gi)
+#   instances:  Postgres instances (1 = single, 2+ = primary + streaming replicas with automatic failover)
+#   restore:    "2026-11-13T14:20:38Z"     (point-in-time restore: switches the tenant to a DB recovered to that second)
+acme:
+  size: s
+globex:
+  size: s
