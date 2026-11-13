@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: odoo-from-ingress
+spec:
+  podSelector:
+    matchLabels: { app: odoo }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: traefik }
+      ports:
+        - { port: 8069 }
+        - { port: 8072 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pooler-from-odoo
+spec:
+  podSelector:
+    matchLabels: { cnpg.io/podRole: pooler }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: odoo }
+      ports:
+        - { port: 5432 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-access
+spec:
+  podSelector:
+    matchLabels: { cnpg.io/podRole: instance }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { cnpg.io/podRole: pooler }
+        - podSelector:
+            matchLabels: { cnpg.io/podRole: instance }
+      ports:
+        - { port: 5432 }
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: cnpg-system }
+      ports:
+        - { port: 8000 }
+        - { port: 5432 }
