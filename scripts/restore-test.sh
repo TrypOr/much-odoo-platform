@@ -55,6 +55,11 @@ spec:
   instances: 1
   imageName: $(kubectl -n "$t" get cluster "$db" -o jsonpath='{.spec.imageName}')
   storage: { size: 2Gi }
+  # keep the backup sidecar in the spec (no archiving): otherwise CNPG restarts the pod right after recovery
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: false
+      parameters: { barmanObjectName: origin }
   bootstrap:
     recovery:
       source: origin
