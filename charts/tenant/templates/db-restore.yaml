@@ -6,6 +6,8 @@ metadata:
 spec:
   instances: {{ .Values.db.instances }}
   imageName: {{ .Values.db.image }}
+  # pooled Odoo connections never close by themselves; don't let a dying primary wait 180s for them
+  smartShutdownTimeout: {{ .Values.db.smartShutdownTimeout }}
   storage:
     size: {{ .Values.db.storage }}
   resources:
