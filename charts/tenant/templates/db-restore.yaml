@@ -20,7 +20,8 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: {{ .Release.Namespace }}-backups
-        serverName: {{ .Release.Namespace }}-db-restore
+        # unique per restore: a second restore of the same tenant must not collide with the first one's archive
+        serverName: {{ include "tenant.restoreServerName" . }}
   bootstrap:
     recovery:
       source: origin

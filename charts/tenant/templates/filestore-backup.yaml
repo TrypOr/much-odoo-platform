@@ -28,9 +28,9 @@ spec:
               command: ["sh", "-c"]
               args:
                 - >-
-                  rclone sync /filestore s3:{{ .Values.backup.bucket }}/{{ .Release.Namespace }}/filestore
+                  rclone sync /filestore s3:{{ .Values.backup.bucket }}/{{ include "tenant.backupPrefix" . }}/filestore
                   --exclude "sessions/**"
-                  --backup-dir s3:{{ .Values.backup.bucket }}/{{ .Release.Namespace }}/filestore-history/$(date +%Y%m%dT%H%M%S)
+                  --backup-dir s3:{{ .Values.backup.bucket }}/{{ include "tenant.backupPrefix" . }}/filestore-history/$(date +%Y%m%dT%H%M%S)
                   --stats-one-line -v
               env:
                 - { name: HOME, value: /tmp }

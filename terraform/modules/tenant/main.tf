@@ -73,6 +73,9 @@ resource "helm_release" "tenant" {
     odoo = {
       hostname = var.domain
     }
+    backup = {
+      namespaceUID = kubernetes_namespace_v1.this.metadata[0].uid
+    }
   })]
   depends_on = [
     kubernetes_secret_v1.db,
