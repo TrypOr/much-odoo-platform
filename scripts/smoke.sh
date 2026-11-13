@@ -32,11 +32,10 @@ for t in $TENANTS; do
     log "Tenant $t"
     db="$(kubectl -n "$t" get svc db -o jsonpath='{.metadata.annotations.much\.io/db-cluster}' 2>/dev/null || true)"
     db="${db:-$t-db}"
-    check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.status.phase}' 2>/dev/null ||
-  true)"
+    check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
     pw="$(kubectl -n "$t" get secret odoo-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
     check "$t sql via pooler" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- env PGPASSWORD="$pw" \
-    psql -h db -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
+      psql -h db -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
 
     cond() { kubectl -n "$t" get cluster "$db" -o jsonpath="{.status.conditions[?(@.type==\"$1\")].status}" 2>/dev/null || true; }
     archiver="$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.spec.plugins[?(@.isWALArchiver==true)].name}' 2>/dev/null || true)"
@@ -50,9 +49,8 @@ for t in $TENANTS; do
     check "$t filestore backup has run" yes "$([ -n "$(kubectl -n "$t" get jobs -o jsonpath='{range .items[?(@.status.succeeded==1)]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep filestore-backup)" ] && echo yes || echo no)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
-    check "$t db manager disabled" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- python3 -c \
-    "import urllib.request;print(int('disabled by the administrator' in
-    urllib.request.urlopen('http://localhost:8069/web/database/manager').read().decode()))" 2>/dev/null || true)"
+    manager="$(odoo_body "$t" /web/database/manager)"
+    check "$t db manager disabled" 1 "$(grep -c 'disabled by the administrator' <<<"$manager" || true)"
 
     h="$t.localtest.me"; R=(--resolve "$h:8443:127.0.0.1")
     check "$t https login" 200 "$(curl -s --cacert "$CA" "${R[@]}" -o /dev/null -w '%{http_code}' --max-time 10 \
