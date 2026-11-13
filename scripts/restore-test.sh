@@ -9,6 +9,7 @@ primary="$(kubectl -n "$t" get cluster "$db" -o jsonpath='{.status.currentPrimar
 store="$(kubectl -n "$t" get objectstore "$t-backups" -o jsonpath='{.spec.configuration.destinationPath} {.spec.configuration.endpointURL}')"
 read -r dest endpoint <<<"$store"
 q() { kubectl -n "$t" exec "$primary" -c postgres -- psql -U postgres -d odoo -v ON_ERROR_STOP=1 -tAc "$1"; }
+# shellcheck disable=SC2329  # invoked via trap
 cleanup() { kubectl delete ns "$ns" --ignore-not-found --wait=false >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
@@ -29,6 +30,7 @@ check "WAL $seg archived" t "$(q "select coalesce(last_archived_wal >= '$seg', f
 log "3/5 Restore $db from object storage into namespace $ns"
 kubectl delete ns "$ns" --ignore-not-found >/dev/null
 kubectl create ns "$ns" >/dev/null
+# shellcheck disable=SC2016  # go-template, not shell
 kubectl -n "$t" get secret backup-s3 -o go-template='{{range $k,$v := .data}}{{$k}}={{$v | base64decode}}{{"\n"}}{{end}}' \
   | kubectl -n "$ns" create secret generic backup-s3 --from-env-file=/dev/stdin >/dev/null
 start=$(date +%s)
@@ -53,6 +55,11 @@ spec:
   instances: 1
   imageName: $(kubectl -n "$t" get cluster "$db" -o jsonpath='{.spec.imageName}')
   storage: { size: 2Gi }
+  # keep the backup sidecar in the spec (no archiving): otherwise CNPG restarts the pod right after recovery
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: false
+      parameters: { barmanObjectName: origin }
   bootstrap:
     recovery:
       source: origin

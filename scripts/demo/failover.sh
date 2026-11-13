@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Demo: kill a tenant's Postgres primary under live traffic and measure the impact.
+# shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/../lib.sh"
 
 t="${1:?usage: failover.sh <tenant>}"

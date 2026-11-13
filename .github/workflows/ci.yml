@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TERRAFORM_VERSION: 1.17.1
+  HELM_VERSION: v3.22.1
+  K3D_VERSION: v5.9.0
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      - name: terraform fmt
+        run: terraform -chdir=terraform fmt -check -recursive
+      - name: terraform validate
+        run: |
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: helm lint
+        run: helm lint charts/*
+      - name: render charts
+        run: |
+          mkdir -p rendered
+          for c in tenant monitoring platform objectstore; do
+            helm template t "charts/$c" -n acme --set odoo.hostname=acme.localtest.me > "rendered/$c.yaml"
+          done
+          helm template t charts/tenant -n acme --set db.cluster=restore \
+            --set db.restoreTargetTime=2026-01-01T00:00:00Z > rendered/tenant-restore.yaml
+      - name: kubeconform (incl. CRD schemas)
+        run: |
+          docker run --rm -v "$PWD/rendered:/m" ghcr.io/yannh/kubeconform:v0.7.0 \
+            -strict -summary -kubernetes-version 1.35.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            /m/tenant.yaml /m/tenant-restore.yaml /m/monitoring.yaml /m/platform.yaml /m/objectstore.yaml
+
+      - name: shellcheck
+        run: |
+          docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck-alpine:v0.11.0 \
+            shellcheck -x scripts/*.sh scripts/demo/*.sh
+
+  e2e:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: free disk space (the platform's images exceed the runner's default free space)
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af >/dev/null
+          df -h /
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+
+      - name: one tenant (runner memory)
+        run: |
+          printf 'acme:\n  size: s\n' > tenants.yaml
+
+      - name: make up
+        run: make up
+
+      - name: first filestore backup and external probe
+        run: |
+          source scripts/lib.sh
+          kubectl -n acme create job filestore-backup-initial --from=cronjob/filestore-backup
+          kubectl -n acme wait job/filestore-backup-initial --for=condition=complete --timeout=300s
+          for _ in $(seq 1 30); do [ "$(prom 'probe_success{job="odoo-login",tenant="acme"}')" = 1 ] && break; sleep 10; done
+          for _ in $(seq 1 30); do
+            [ "$(kubectl -n acme get cluster acme-db -o jsonpath='{.status.conditions[?(@.type=="LastBackupSucceeded")].status}')" = True ] && break
+            sleep 10
+          done
+          for _ in $(seq 1 12); do kubectl -n monitoring logs deploy/alert-sink | grep -c 'POST /deadman' && break; sleep 10; done
+
+      - name: make smoke
+        run: make smoke
+
+      - name: make restore-test
+        run: make restore-test TENANT=acme
+
+      - name: idempotency (second plan has no changes)
+        run: terraform -chdir=terraform plan -detailed-exitcode -input=false
+
+      - name: diagnostics
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by=.lastTimestamp | tail -60 || true
+          kubectl get clusters,backups,poolers -A || true
