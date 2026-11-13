@@ -5,7 +5,7 @@ metadata:
 data:
   odoo.conf.tmpl: |
     [options]
-    db_host = {{ .Release.Namespace }}-pooler-rw
+    db_host = db
     db_port = 5432
     db_user = odoo
     db_password = __DB_PASSWORD__
@@ -25,7 +25,7 @@ data:
     set -eu
     sed -e "s|__DB_PASSWORD__|$DB_PASSWORD|" -e "s|__ADMIN_PASSWD__|$ADMIN_PASSWD|" \
       /config/odoo.conf.tmpl > /etc/odoo/odoo.conf
-    export PGHOST={{ .Release.Namespace }}-pooler-rw PGUSER=odoo PGDATABASE=odoo PGPASSWORD="$DB_PASSWORD"
+    export PGHOST=db PGUSER=odoo PGDATABASE=odoo PGPASSWORD="$DB_PASSWORD"
     until pg_isready -q; do echo "waiting for database"; sleep 2; done
     if psql -tAc "select 1 from ir_module_module where name='base' and state='installed'" 2>/dev/null | grep -q 1; then
       echo "database already initialised"

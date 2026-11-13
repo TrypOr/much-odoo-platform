@@ -13,6 +13,7 @@ spec:
       labels: { app: odoo }
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/odoo-config.yaml") . | sha256sum }}
+        much.io/db-cluster: {{ include "tenant.dbCluster" . }}
     spec:
       automountServiceAccountToken: false
       securityContext:

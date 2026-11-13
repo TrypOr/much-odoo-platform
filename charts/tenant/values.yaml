@@ -21,3 +21,6 @@ backup:
   bucket: backups
   schedule: "0 0 * * * *"
   retention: 7d
+filestoreBackup:
+  image: rclone/rclone:1.71.2
+  schedule: "*/15 * * * *"
