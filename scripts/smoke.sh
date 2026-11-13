@@ -23,7 +23,7 @@ for t in $TENANTS; do
     check "$t db healthy" "Cluster in healthy state" "$(kubectl -n "$t" get cluster "$t-db" -o jsonpath='{.status.phase}' 2>/dev/null ||
   true)"
     pw="$(kubectl -n "$t" get secret odoo-db -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)"
-    check "$t sql via pooler" 1 "$(kubectl -n "$t" exec "$t-db-1" -c postgres -- env PGPASSWORD="$pw" \
+    check "$t sql via pooler" 1 "$(kubectl -n "$t" exec deploy/odoo -c odoo -- env PGPASSWORD="$pw" \
     psql -h "$t-pooler-rw" -U odoo -d odoo -tAc 'select 1' 2>/dev/null || true)"
 
     check "$t odoo login page" 200 "$(odoo_http "$t" /web/login)"
@@ -38,6 +38,15 @@ for t in $TENANTS; do
       -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
       -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H "Origin: https://$h:8443" \
       "https://$h:8443/websocket" || true)"
+
+    spec="$(kubectl -n "$t" get deploy odoo -o jsonpath='{.spec.template.spec.securityContext.runAsNonRoot}/{.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem}/{.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation}' 2>/dev/null || true)"
+    check "$t odoo enforced non-root/read-only/no-escalation" "true/true/false" "$spec"
+    check "$t odoo cannot bypass pooler" blocked "$(can_connect "$t" "$t-db-rw")"
+    for o in $TENANTS; do
+      [ "$o" = "$t" ] && continue
+      check "$t cannot reach $o database" blocked "$(can_connect "$t" "$o-pooler-rw.$o")"
+    done
+    
 done
 
 exit "$fail"

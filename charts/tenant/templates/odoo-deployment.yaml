@@ -14,10 +14,21 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/odoo-config.yaml") . | sha256sum }}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
       initContainers:
         - name: init
           image: {{ .Values.odoo.image }}
           command: ["bash", "/config/init.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
           env:
             - name: DB_PASSWORD
               valueFrom: { secretKeyRef: { name: odoo-db, key: password } }
@@ -28,10 +39,15 @@ spec:
             - { name: config-tmpl, mountPath: /config }
             - { name: config, mountPath: /etc/odoo }
             - { name: filestore, mountPath: /var/lib/odoo }
+            - { name: tmp, mountPath: /tmp }
       containers:
         - name: odoo
           image: {{ .Values.odoo.image }}
           command: ["odoo", "-c", "/etc/odoo/odoo.conf"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
           ports:
             - { name: http, containerPort: 8069 }
             - { name: websocket, containerPort: 8072 }
@@ -47,10 +63,13 @@ spec:
           volumeMounts:
             - { name: config, mountPath: /etc/odoo }
             - { name: filestore, mountPath: /var/lib/odoo }
+            - { name: tmp, mountPath: /tmp }
       volumes:
         - name: config-tmpl
           configMap: { name: odoo-config }
         - name: config
-          emptyDir: {}
+          emptyDir: { medium: Memory, sizeLimit: 1Mi }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
         - name: filestore
           persistentVolumeClaim: { claimName: odoo-filestore }

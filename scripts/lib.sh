@@ -21,3 +21,8 @@ kubectl -n "$1" exec deploy/odoo -c odoo -- python3 -c "import urllib.request,ur
 try: print(urllib.request.urlopen('http://localhost:8069'+sys.argv[1]).status)
 except urllib.error.HTTPError as e: print(e.code)" "$2" 2>/dev/null || true
 }
+can_connect() {
+kubectl -n "$1" exec deploy/odoo -c odoo -- python3 -c "import socket;s=socket.socket();s.settimeout(3)
+try: s.connect(('$2',5432)); print('open')
+except Exception: print('blocked')" 2>/dev/null || true
+}
