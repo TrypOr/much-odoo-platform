@@ -10,6 +10,9 @@ spec:
     size: {{ .Values.db.storage }}
   resources:
     {{- toYaml .Values.db.resources | nindent 4 }}
+  monitoring:
+    customQueriesConfigMap:
+      - { name: odoo-queries, key: queries }
   plugins:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true

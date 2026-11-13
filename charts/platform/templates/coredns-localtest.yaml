@@ -1,0 +1,9 @@
+# Resolve tenant hostnames to Traefik inside the cluster, so in-cluster probes hit the same path users do.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  localtest.override: |
+    rewrite name regex (.+)\.localtest\.me traefik.kube-system.svc.cluster.local answer auto

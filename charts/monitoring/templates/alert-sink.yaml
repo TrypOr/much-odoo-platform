@@ -1,0 +1,42 @@
+# Stand-in for PagerDuty/Slack: logs every webhook Alertmanager sends (kubectl logs deploy/alert-sink).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: alert-sink }
+  template:
+    metadata:
+      labels: { app: alert-sink }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: echo
+          image: mendhak/http-https-echo:34
+          env:
+            - { name: HTTP_PORT, value: "8080" }
+            - { name: LOG_IGNORE_PATH, value: "/healthz" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          ports:
+            - { name: http, containerPort: 8080 }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 96Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-sink
+spec:
+  selector: { app: alert-sink }
+  ports:
+    - { name: http, port: 8080, targetPort: http }

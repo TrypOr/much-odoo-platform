@@ -1,0 +1,4 @@
+apiVersion: v2
+name: monitoring
+description: much. alert rules, dashboards and the local alert receiver
+version: 0.3.0

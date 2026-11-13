@@ -17,5 +17,5 @@ module "tenant" {
   chart_path          = "${path.module}/../charts/tenant"
   s3_access_key       = random_password.s3_access_key.result
   s3_secret_key       = random_password.s3_secret_key.result
-  depends_on          = [helm_release.cnpg, helm_release.barman_plugin, helm_release.platform, helm_release.objectstore]
+  depends_on          = [helm_release.cnpg, helm_release.barman_plugin, helm_release.platform, helm_release.objectstore, helm_release.kube_prometheus_stack, helm_release.blackbox]
 }

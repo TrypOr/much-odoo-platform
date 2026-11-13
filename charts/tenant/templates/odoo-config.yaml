@@ -33,3 +33,5 @@ data:
       echo "installing base"
       odoo -c /etc/odoo/odoo.conf -i base --stop-after-init
     fi
+    # least-privilege read access for the metrics exporter (Odoo cron health)
+    psql -q -c "GRANT SELECT ON ir_cron TO pg_monitor"

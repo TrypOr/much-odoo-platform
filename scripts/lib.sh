@@ -4,6 +4,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 fail=0
+prom() {
+  kubectl get --raw "/api/v1/namespaces/monitoring/services/kps-kube-prometheus-stack-prometheus:9090/proxy/api/v1/query?query=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$1")" 2>/dev/null \
+    | python3 -c 'import sys,json;r=json.load(sys.stdin)["data"]["result"];print(r[0]["value"][1] if r else "")' 2>/dev/null || true
+}
 TENANTS="${TENANTS:-acme globex}"
 log()   { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
 tf()    { terraform -chdir=terraform "$@"; }

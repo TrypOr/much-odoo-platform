@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: much-dashboards
+  labels:
+    grafana_dashboard: "1"
+data:
+  odoo-tenants.json: |-
+{{ .Files.Get "dashboards/odoo-tenants.json" | indent 4 }}
